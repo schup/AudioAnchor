@@ -1,7 +1,11 @@
 package com.prangesoftwaresolutions.audioanchor.activities;
 
+import static android.media.CamcorderProfile.get;
+
 import android.Manifest;
+import android.app.Activity;
 import android.app.LoaderManager;
+import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
@@ -14,10 +18,15 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
+import android.nfc.NdefMessage;
+import android.nfc.NdefRecord;
+import android.nfc.NfcAdapter;
+import android.nfc.tech.NfcF;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.Parcelable;
 import android.preference.PreferenceManager;
 import androidx.annotation.NonNull;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
@@ -55,6 +64,7 @@ import com.prangesoftwaresolutions.audioanchor.utils.Utils;
 
 import java.io.File;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 
 
@@ -105,6 +115,8 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
 
     // Migrator
     private Migrator mMigrator;
+
+    private NfcAdapter nfcAdapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -282,6 +294,30 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
                 editor.apply();
             }
         }
+        nfcAdapter = NfcAdapter.getDefaultAdapter(this);
+        handleIntent(getIntent());
+    }
+
+    private void handleIntent(Intent intent) {
+        if (NfcAdapter.ACTION_NDEF_DISCOVERED.equals(intent.getAction())) {
+            // got intent NFC
+            Parcelable[] parcelableArrayExtra = intent.getParcelableArrayExtra(NfcAdapter.EXTRA_NDEF_MESSAGES);
+            if (parcelableArrayExtra != null && parcelableArrayExtra.length > 0) {
+                NdefMessage ndefMessage = (NdefMessage) parcelableArrayExtra[0];
+                NdefRecord[] records = ndefMessage.getRecords();
+                if (records != null && records.length > 0) {
+                    byte[] payload = records[0].getPayload();
+                    String payloadString = new String(payload, StandardCharsets.UTF_8);
+                    long albumId = Long.parseLong(payloadString);
+
+                    Intent newIntent = new Intent(MainActivity.this, AlbumActivity.class);
+                    newIntent.putExtra(getString(R.string.album_id), albumId);
+                    startActivity(newIntent);
+                }
+
+            }
+
+        }
     }
 
     @Override
@@ -366,6 +402,7 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         super.onResume();
         bindToServiceIfRunning();
         getLoaderManager().restartLoader(0, null, this);
+        setupForegroundDispatch(this, nfcAdapter);
     }
 
     @Override
@@ -504,6 +541,25 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
     @Override
     public void onPlayMsgReceived() {
         mDoNotBindService = false;
+    }
+
+    @Override
+    protected void onPause() {
+        stopForegroundDispatch(this, nfcAdapter);
+        super.onPause();
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        /**
+         * This method gets called, when a new Intent gets associated with the current activity instance.
+         * Instead of creating a new activity, onNewIntent will be called. For more information have a look
+         * at the documentation.
+         *
+         * In our case this method gets called, when the user attaches a Tag to the device.
+         */
+        handleIntent(intent);
     }
 
     @Override
@@ -723,5 +779,28 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         // Create and show the AlertDialog
         AlertDialog alertDialog = builder.create();
         alertDialog.show();
+    }
+
+    public static void setupForegroundDispatch(final Activity activity, NfcAdapter nfcAdapter) {
+        // foreground NFC scanning
+
+        PendingIntent pendingIntent = PendingIntent.getActivity(
+                activity, 0, new Intent(activity.getApplicationContext(), activity.getClass()).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP), 0);
+
+        IntentFilter ndef = new IntentFilter(NfcAdapter.ACTION_NDEF_DISCOVERED);
+        try {
+            ndef.addDataType("audio/book");
+        }
+        catch (IntentFilter.MalformedMimeTypeException e) {
+            throw new RuntimeException("fail", e);
+        }
+        IntentFilter[] intentFiltersArray = new IntentFilter[] { ndef };
+        String[][] techLists = new String[][] { new String[] { NfcF.class.getName() } };
+        nfcAdapter.enableForegroundDispatch(activity, pendingIntent, intentFiltersArray, techLists);
+        //
+    }
+
+    public static void stopForegroundDispatch(final Activity activity, NfcAdapter nfcAdapter) {
+        nfcAdapter.disableForegroundDispatch(activity);
     }
 }

@@ -78,6 +78,8 @@ public class AlbumCursorAdapter extends CursorAdapter {
         String timeStr = Utils.getTimeString(context, times[0], times[1]);
         progressTV.setText(timeStr);
 
+        titleTV.setText("(" + id + ") " + title);
+
         // Get the path of the thumbnail of the current album and set the src of the image view
         ImageView thumbnailIV = view.findViewById(R.id.audio_storage_item_thumbnail);
 

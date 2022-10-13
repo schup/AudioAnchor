@@ -13,18 +13,12 @@ import android.content.ServiceConnection;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
+import android.nfc.NfcAdapter;
+import android.nfc.Tag;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.preference.PreferenceManager;
-import androidx.annotation.NonNull;
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
-import androidx.localbroadcastmanager.content.LocalBroadcastManager;
-import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
-import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.app.AppCompatActivity;
 import android.util.Log;
 import android.view.ActionMode;
 import android.view.Menu;
@@ -37,16 +31,25 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
+
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.prangesoftwaresolutions.audioanchor.R;
+import com.prangesoftwaresolutions.audioanchor.adapters.AudioFileCursorAdapter;
+import com.prangesoftwaresolutions.audioanchor.data.AnchorContract;
+import com.prangesoftwaresolutions.audioanchor.helpers.Synchronizer;
 import com.prangesoftwaresolutions.audioanchor.listeners.PlayStatusChangeListener;
 import com.prangesoftwaresolutions.audioanchor.listeners.SynchronizationStateListener;
 import com.prangesoftwaresolutions.audioanchor.models.Album;
 import com.prangesoftwaresolutions.audioanchor.models.AudioFile;
 import com.prangesoftwaresolutions.audioanchor.receivers.PlayStatusReceiver;
 import com.prangesoftwaresolutions.audioanchor.services.MediaPlayerService;
-import com.prangesoftwaresolutions.audioanchor.R;
-import com.prangesoftwaresolutions.audioanchor.helpers.Synchronizer;
-import com.prangesoftwaresolutions.audioanchor.adapters.AudioFileCursorAdapter;
-import com.prangesoftwaresolutions.audioanchor.data.AnchorContract;
 import com.prangesoftwaresolutions.audioanchor.utils.BitmapUtils;
 import com.prangesoftwaresolutions.audioanchor.utils.DBAccessUtils;
 import com.prangesoftwaresolutions.audioanchor.utils.StorageUtil;
@@ -98,6 +101,7 @@ public class AlbumActivity extends AppCompatActivity implements LoaderManager.Lo
 
     // Synchronizer
     private Synchronizer mSynchronizer;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -167,7 +171,7 @@ public class AlbumActivity extends AppCompatActivity implements LoaderManager.Lo
 
             // Open the PlayActivity for the clicked audio file
             Intent intent = new Intent(AlbumActivity.this, PlayActivity.class);
-            intent.putExtra(getString(R.string.curr_audio_id), rowId);
+            intent.putExtra(getString(R.string.curr_audio_id), mAlbum.getLastPlayedID());
             startActivity(intent);
         });
 
@@ -279,6 +283,16 @@ public class AlbumActivity extends AppCompatActivity implements LoaderManager.Lo
         // This needs to be a receiver for global broadcasts, as the deleteIntent is broadcast by
         // Android's notification framework
         registerReceiver(mRemoveNotificationReceiver, new IntentFilter(MediaPlayerService.BROADCAST_REMOVE_NOTIFICATION));
+
+
+
+
+
+        //
+        Intent intent = new Intent(AlbumActivity.this, PlayActivity.class);
+        intent.putExtra(getString(R.string.curr_audio_id), mAlbum.getLastPlayedID());
+        startActivity(intent);
+
     }
 
     @Override
@@ -656,4 +670,26 @@ public class AlbumActivity extends AppCompatActivity implements LoaderManager.Lo
         AlertDialog alertDialog = builder.create();
         alertDialog.show();
     }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        Tag tagFromIntent = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
+        tagFromIntent.toString();
+
+    }
+
+    private void playAlbum(int id) {
+        mAlbum = Album.getAlbumByID(this, id);
+        Intent intent = new Intent(AlbumActivity.this, PlayActivity.class);
+        intent.putExtra(getString(R.string.curr_audio_id), mAlbum.getLastPlayedID());
+        startActivity(intent);
+    }
+
+
 }

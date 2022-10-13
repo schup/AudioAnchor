@@ -33,6 +33,7 @@ android {
         disable 'GoogleAppIndexingWarning'
         abortOnError false
     }
+    namespace 'com.prangesoftwaresolutions.audioanchor'
 }
 
 dependencies {
